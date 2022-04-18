@@ -1,3 +1,1 @@
 ,tradingsymbol,exchange,quantity,timeframe,multiplier,entry_price,entry_time,exit_price,exit_time,target_price,sl_price,Row_Type,profit,ltp,Trend,user_id
-0,NIFTY2241318000CE,NFO,50,1,1,13.1,2022-04-11 15:17:28.597971,13.2,2022-04-11 15:17:30.487530,8.05,10.05,F,4.999999999999982,13.2,BUY,MH0069
-1,NIFTY2241318000CE,NFO,50,1,1,13.1,2022-04-11 15:17:28.597971,13.2,2022-04-11 15:17:30.487530,8.05,10.05,F,4.999999999999982,13.2,BUY,MJ0724

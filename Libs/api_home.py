@@ -52,6 +52,7 @@ class ApiHome(QtWidgets.QMainWindow):
         self.ui.frame_trade_buttons.sizePolicy().setRetainSizeWhenHidden(True)
 
         # -------------- some explicit value settings -----------------
+        self.setWindowIcon(QtGui.QIcon(icons_lib.Icons.get_pixmap("APP_ICON")))
         self.ui.pushButton_recal_oi_timer.setText("Refresh")
         self.setWindowTitle(f"{settings.APP_NAME} {settings.App_VERSION} {settings.EXTENSION}")
         self.ui.label_app_logo.setPixmap(icons_lib.Icons.get_pixmap("tradexcb_logo"))  # top logo

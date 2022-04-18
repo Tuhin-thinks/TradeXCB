@@ -9,11 +9,11 @@ from datetime import datetime, timedelta
 import numpy as np
 import openpyxl
 import pandas as pd
+from pandas.core.common import SettingWithCopyWarning
 import talib
 
 from Libs.Files import handle_user_details
 from Libs.Files.TradingSymbolMapping import StrategiesColumn
-# import ipdb
 from Libs.Storage import app_data
 from Libs.Utils import settings, exception_handler
 from .TA_Lib import HA
@@ -21,6 +21,7 @@ from .main_broker_api.All_Broker import All_Broker
 
 pd.set_option('expand_frame_repr', False)
 warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=SettingWithCopyWarning)
 
 logger = exception_handler.getAlgoLogger(__name__)
 
@@ -208,7 +209,7 @@ def do_assertion(name, variable):
 
 # ------------ function to add new rows in run-time ------------
 def add_rows(old_instruments_df_dict, main_broker, users_df_dict,
-             first_run=False):  # TODO Add this in main Code for adding Rows
+             first_run=False):
     # Workbook
     wb = openpyxl.load_workbook(settings.DATA_FILES['tradexcb_excel_file'])
     instrument_sheet = wb['Sheet1']
@@ -267,7 +268,7 @@ def add_rows(old_instruments_df_dict, main_broker, users_df_dict,
             time.sleep(5)
         except Exception as e:
             logger.error(f"Error in getting live ticks {sys.exc_info()}", exc_info=True)
-            raise Exception(f"Error in getting live ticks {sys.exc_info()}")
+            raise ValueError(f"Error in getting live ticks {sys.exc_info()}")
 
     for each_instrument in instrument_list:
         if each_instrument not in main_broker.latest_ltp:
@@ -355,20 +356,12 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
     try:
         instruments_df_dict, instruments_df = add_rows(instruments_df_dict, main_broker,
                                                        users_df_dict,
-                                                       first_run=True)  # TODO Add this in main Code for adding Rows
+                                                       first_run=True)
     except Exception as e:
         logger.critical(f"Error in {process_name}", exc_info=True)
         manager_dict['algo_running'] = False
         manager_dict['algo_error'] = f"{process_name} failed, Error : {sys.exc_info()}, {e.__str__()}"
         return
-    # try:
-    #     main_broker.get_live_ticks()
-    #     logger.debug("Getting Live Ticks")
-    # except Exception:
-    #     logger.critical(f"Error in Getting Live Ticks. Error : {sys.exc_info()} ", exc_info=True)
-    #     manager_dict['algo_error'] = f"Error in Getting Live Ticks. Error : {sys.exc_info()}"
-    #     manager_dict['algo_running'] = False
-    #     return
     logger.info(f"Starting Strategy")
     final_df = pd.DataFrame(columns=list(instruments_df.columns) + ['ltp', 'tradingsymbol'])
     # main_broker : All_Broker.All_Broker
@@ -377,12 +370,11 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
 
     while manager_dict['force_stop'] is False:
         time.sleep(1)  # wait for 1 second/iteration
-        if manager_dict['update_rows'] == 1:  # TODO Add this in main Code for adding Rows
-            manager_dict['update_rows'] = 0  # TODO Add this in main Code for adding Rows
+        if manager_dict['update_rows'] == 1:
+            manager_dict['update_rows'] = 0
             instruments_df_dict, instruments_df = add_rows(instruments_df_dict, main_broker,
-                                                           users_df_dict)  # TODO Add this in main Code for adding Rows
+                                                           users_df_dict)
             # reset final df, as new rows have been added
-            # TODO: Verify this
             final_df = pd.DataFrame(columns=list(instruments_df.columns) + ['ltp', 'tradingsymbol'])
 
         if datetime.now() < nine_sixteen:
@@ -415,7 +407,7 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                 return
 
         final_all_user_df.to_csv(
-            settings.DATA_FILES.get('POSITIONS_FILE_PATH'))  # TODO PNL of all users by the lot executed by the user
+            settings.DATA_FILES.get('POSITIONS_FILE_PATH'))  # PNL of all users by the lot executed by the user
 
         order_book_dict = dict()
         for each_user in users_df_dict:
@@ -444,7 +436,7 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
             except Exception as e:
                 logger.critical(f"Error in Creating Order Book {e.__str__()}", exc_info=True)
 
-        # TODO order_book_dict # This contains Orderbook of all the clients
+        # This contains Orderbook of all the clients
         # ------- cannot export broker instance ----------
         orderbook_export_data = {x: [] for x in app_data.OMS_TABLE_COLUMNS}
         for each_key in instruments_df_dict:
@@ -537,7 +529,6 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                     atr_trend_bearish = 0
 
                     if this_instrument['ATRTS'] == 'YES':
-                        logger.info(f"df super trend: {this_instrument['tradingsymbol']}, {df['SUPERTREND'].tail(2)}")  # TODO: Remove this
                         if this_instrument['atrts_signal'] == 'new':
                             atr_trend_bearish = 1 if ((df['SUPERTREND'].tail(1).head(1).values[0] == 'down') & (
                                     df['SUPERTREND'].tail(2).head(1).values[0] == 'up')) else 0
@@ -607,11 +598,11 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                         price_trend_bullish = 1
                     # print all values for debugging, TODO: remove this later
                     print(f"""
-                    {price_above_trend_bullish=}
-                    {price_trend_bullish=}
-                    {ma_trend_bullish=}
-                    {vwap_trend_bullish=}
-                    {atr_trend_bullish=}""")
+{price_above_trend_bullish=}
+{price_trend_bullish=}
+{ma_trend_bullish=}
+{vwap_trend_bullish=}
+{atr_trend_bullish=}""")
 
                     print(f"""
 {price_above_trend_bearish=}
@@ -621,14 +612,14 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
 {atr_trend_bearish=}
 {this_instrument['multiplier']=} != -1
 {this_instrument['transaction_type']=} == 'SELL'""")
-                    logger.info(f"{price_above_trend_bullish} and {price_trend_bullish} and {ma_trend_bullish} and \
-                            {vwap_trend_bullish} and {atr_trend_bullish} and \
-                            {this_instrument['multiplier']} != 1 and {this_instrument['transaction_type']} == 'BUY'")
+                    logger.info(f"{price_above_trend_bullish=} and {price_trend_bullish=} and {ma_trend_bullish=} and "
+                                f"{vwap_trend_bullish=} and {atr_trend_bullish=} and "
+                                f"{this_instrument['multiplier']} != 1 and {this_instrument['transaction_type']} == 'BUY'")
 
-                    logger.info(f"{price_above_trend_bearish} and {price_trend_bearish} and {ma_trend_bearish} and {price_trend_bearish} and {ma_trend_bearish} and\
+                    logger.info(
+                        f"{price_above_trend_bearish} and {price_trend_bearish} and {ma_trend_bearish} and {price_trend_bearish} and {ma_trend_bearish} and\
 {vwap_trend_bearish} and {atr_trend_bearish} and\
 {this_instrument['multiplier']} != -1 and {this_instrument['transaction_type']} == 'SELL'")
-
 
                     if price_above_trend_bullish and price_trend_bullish and ma_trend_bullish and \
                             vwap_trend_bullish and atr_trend_bullish and \
@@ -694,7 +685,8 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
 
                     elif (price_above_trend_bearish and price_trend_bearish and ma_trend_bearish and
                           vwap_trend_bearish and atr_trend_bearish and
-                          this_instrument['multiplier'] != -1 and this_instrument['transaction_type'].upper() == 'SELL'):
+                          this_instrument['multiplier'] != -1 and this_instrument[
+                              'transaction_type'].upper() == 'SELL'):
                         logger.info(f" In Sell Loop. for {this_instrument['tradingsymbol']}")
                         logger.info(f" Sell Signal has been Activated for {this_instrument['tradingsymbol']}")
                         this_instrument['status'] = 1
@@ -790,10 +782,10 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                         if (ltp * this_instrument['multiplier']
                                 <= this_instrument['entry_price'] * this_instrument['multiplier']):
                             for each_user in this_instrument['entry_order_ids']:
+                                this_user = users_df_dict[each_user]
                                 this_user_order_details = this_instrument['entry_order_ids'][each_user]
                                 broker = this_user_order_details['broker']
                                 order_id = this_user_order_details['order_id']
-                                main_order = this_instrument['order']
                                 order_status, status_message = broker.get_order_status(order_id=order_id)
                                 this_user_order_details['order_status'] = order_status
                                 if order_status == 'COMPLETE':
@@ -865,9 +857,9 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                         this_instrument['exit_time'] = datetime.now()
                         this_instrument['exit_price'] = ltp
                         this_instrument['status'] = 0
-                        this_instrument['vwap_signal'] = 'new'  # TODO Tuhin Add this in main code
-                        this_instrument['atrts_signal'] = 'new'  # TODO Tuhin Add this main code
-                        this_instrument['moving_average_signal'] = 'new'  # TODO Tuhin Add this main code
+                        this_instrument['vwap_signal'] = 'new'
+                        this_instrument['atrts_signal'] = 'new'
+                        this_instrument['moving_average_signal'] = 'new'
                         # Cancel Pending SL Order and Placing a Market Order
                         if paper_trade == 0:
                             for each_user in users_df_dict:
@@ -929,9 +921,9 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                         this_instrument['exit_time'] = datetime.now()
                         this_instrument['exit_price'] = ltp
                         this_instrument['status'] = 0
-                        this_instrument['vwap_signal'] = 'new'  # TODO Tuhin Add this in main code
-                        this_instrument['atrts_signal'] = 'new'  # TODO Tuhin Add this main code
-                        this_instrument['moving_average_signal'] = 'new'  # TODO Tuhin Add this main code
+                        this_instrument['vwap_signal'] = 'new'
+                        this_instrument['atrts_signal'] = 'new'
+                        this_instrument['moving_average_signal'] = 'new'
 
                         # Cancel Pending SL Order and Placing a Market Order
                         if paper_trade == 0:
@@ -993,9 +985,9 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                         this_instrument['exit_time'] = datetime.now()
                         this_instrument['exit_price'] = ltp
                         this_instrument['status'] = 0
-                        this_instrument['vwap_signal'] = 'new'  # TODO Tuhin Add this in main code
-                        this_instrument['atrts_signal'] = 'new'  # TODO Tuhin Add this main code
-                        this_instrument['moving_average_signal'] = 'new'  # TODO Tuhin Add this main code
+                        this_instrument['vwap_signal'] = 'new'
+                        this_instrument['atrts_signal'] = 'new'
+                        this_instrument['moving_average_signal'] = 'new'
                         # Cancel Pending SL Order and Placing a Market Order
                         if paper_trade == 0:
                             for each_user in users_df_dict:
@@ -1028,10 +1020,7 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                                         logger.info(f"Order Placed for {each_user} Order_id {order_id}")
                                     elif order_status == 'COMPLETE':
                                         this_user['broker'].cancel_order(order_id)
-
-
-
-                                except:
+                                except Exception:
                                     logger.critical(f"Error in Closing Order Placement for {this_user['Name']}"
                                                     f" Error {sys.exc_info()}", exc_info=True)
 
@@ -1064,4 +1053,5 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
 
 if __name__ == '__main__':
     # instruments_df_dict = dict()
-    main(manager_dict={'paper_trade': 0, 'algo_running': True, 'fore_stop': True, 'algo_error': None}, )
+    main(manager_dict={'paper_trade': 0, 'algo_running': True, 'fore_stop': True, 'algo_error': None},
+         cancel_orders_queue=multiprocessing.Queue())

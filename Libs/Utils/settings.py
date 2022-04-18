@@ -36,6 +36,7 @@ TRADING_NAME_INDEX_MAPPING = {
 AVAILABLE_LOGOS_RCS = [
     "tradexcb_logo.png"
 ]
+APP_ICON = "TradeXCB - icon.png"
 CURRENT_APP_LOGO = random.choice(AVAILABLE_LOGOS_RCS)
 APP_LOGO_img_only = "tradexcb_logo.png"
 THEME_NAME_MAPPING = {

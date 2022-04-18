@@ -45,7 +45,13 @@ class LoginWindow(QMainWindow):
         self.ui = user_login.Ui_MainWindow()
         self.ui.setupUi(self)
 
-        self.resize(QtCore.QSize(1096, 920))
+        self.resize(self.width(), self.minimumHeight())
+        icon = QtGui.QIcon(Icons.get_pixmap("APP_ICON"))
+        self.setWindowIcon(icon)
+        # move window to center of screen
+        QtWidgets.QApplication.desktop().rect().moveCenter(self.rect().center())
+        QtWidgets.QApplication.setWindowIcon(icon)
+        self.setWindowIcon(icon)
 
         logo_pixmap = Icons.get_pixmap("current_app_logo-full")
         self.ui.label_logo.setPixmap(logo_pixmap)
