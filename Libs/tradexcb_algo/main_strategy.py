@@ -364,8 +364,6 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
         return
     logger.info(f"Starting Strategy")
     final_df = pd.DataFrame(columns=list(instruments_df.columns) + ['ltp', 'tradingsymbol'])
-    # main_broker : All_Broker.All_Broker
-    # del users_df_dict[0]
     logger.info(f"{main_broker.latest_ltp}")
 
     while manager_dict['force_stop'] is False:
@@ -578,6 +576,11 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                             ma_trend_bearish = 1 if (df[row_name].tail(1).values[0] >= df['HA_close'].tail(1).values[
                                 0]) and (df[row_name].tail(2).head(1).values[0] < df['HA_close'].tail(2).head(1).values[
                                 0]) else 0
+                        if this_instrument['moving_average_signal'] == 'existing':
+                            ma_trend_bullish = 1 if (df[row_name].tail(1).values[0] < df['HA_close'].tail(1).values[
+                                0]) else 0
+                            ma_trend_bearish = 1 if (df[row_name].tail(1).values[0] >= df['HA_close'].tail(1).values[
+                                0]) else 0
 
                     else:
                         ma_trend_bullish = 1
@@ -585,14 +588,14 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
 
                     if this_instrument['use_priceba'] == 'YES':
                         price_above_trend_bullish = 1 if ltp > this_instrument['buy_above'] else 0
-                        price_above_trend_bearish = 1
+                        price_above_trend_bearish = 0
                     else:
                         price_above_trend_bearish = 1
                         price_above_trend_bullish = 1
 
                     if this_instrument['use_pricesb'] == 'YES':
-                        price_trend_bullish = 1 if ltp < this_instrument['sell_below'] else 0
-                        price_trend_bearish = 1
+                        price_trend_bearish = 1 if ltp < this_instrument['sell_below'] else 0
+                        price_trend_bullish = 0
                     else:
                         price_trend_bearish = 1
                         price_trend_bullish = 1
