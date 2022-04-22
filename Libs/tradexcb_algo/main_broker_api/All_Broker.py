@@ -146,7 +146,6 @@ class All_Broker(main_broker.Broker):
 
                 self.web_socket.subscribe(instrument_token)
                 self.web_socket.set_mode(self.web_socket.MODE_FULL, instrument_token)
-                return
 
             kws = KiteTicker(self.all_data_kwargs[Allcols.apikey.value], self.data["access_token"],
                              self.all_data_kwargs[Allcols.username.value])
@@ -460,7 +459,6 @@ class All_Broker(main_broker.Broker):
                 message = str(sys.exc_info())
                 self.log_this(f"Error in Order Placement")
                 self.log_this(f"{str(sys.exc_info())}")
-
 
         elif self.broker_name.lower() == 'angel':
             product_map = {'MIS': 'INTRADAY', 'NRML': 'CARRYFORWARD', 'CNC': 'DELIVERY'}

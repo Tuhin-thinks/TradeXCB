@@ -619,10 +619,10 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                                 f"{vwap_trend_bullish=} and {atr_trend_bullish=} and "
                                 f"{this_instrument['multiplier']} != 1 and {this_instrument['transaction_type']} == 'BUY'")
 
-                    logger.info(
-                        f"{price_above_trend_bearish} and {price_trend_bearish} and {ma_trend_bearish} and {price_trend_bearish} and {ma_trend_bearish} and\
-{vwap_trend_bearish} and {atr_trend_bearish} and\
-{this_instrument['multiplier']} != -1 and {this_instrument['transaction_type']} == 'SELL'")
+                    logger.info(f"{price_above_trend_bearish} and {price_trend_bearish} and {ma_trend_bearish} and"
+                                f" {price_trend_bearish} and {vwap_trend_bearish} and {atr_trend_bearish} and"
+                                f" {this_instrument['multiplier']} != -1 and"
+                                f" {this_instrument['transaction_type']} == 'SELL'")
 
                     if price_above_trend_bullish and price_trend_bullish and ma_trend_bullish and \
                             vwap_trend_bullish and atr_trend_bullish and \
