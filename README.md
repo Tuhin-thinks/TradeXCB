@@ -33,9 +33,15 @@
 - [ ] stop and start strategy not working, because of the get_live_ticks functions are still alive (how to get control?)
 
 12. Pending Tasks:
-- [ ] Fixing orderbook page update (tradexcb)
-- [ ] Fix process terminate issue (tradexcb)
-- [ ] Upload OHLC data to MYSQL instead of sqlite3 (api)
-- [ ] Add filter logic and candle building logic to API (api)
+- [x] Fixing orderbook page update (tradexcb)
+- [x] Fix process terminate issue (tradexcb)
+- [x] Upload OHLC data to MYSQL instead of sqlite3 (api)
+- [x] Add filter logic and candle building logic to API (api)
 - [ ] Prepare iDelta (cli) for testing with api connection (idelta+api)
-- 
+### Current Issues:
+- [x] Remove extra characters after paste (newline, tab-space, etc).
+- [ ] popup dialog for order status.
+- [ ] store order status string in a datastructure for all active order ids.
+- [ ] place/cancel orders parallelized.
+- [ ] login test after login credentials are added.
+- [ ] when few logs comes at the same point of time, last log is not displayed. #fix-this

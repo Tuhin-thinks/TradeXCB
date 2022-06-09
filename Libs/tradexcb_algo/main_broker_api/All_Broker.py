@@ -120,7 +120,7 @@ class All_Broker(main_broker.Broker):
                 try:
                     for x in ticks:
                         # print("One Tick : ", x)
-                        ts = x['timestamp']
+                        ts = x['last_trade_time']
                         if ts is None:
                             continue
 
@@ -497,11 +497,11 @@ class All_Broker(main_broker.Broker):
         return order_id, message
 
     def cancel_order(self, order_id):
-        '''
+        """
 
         :param kwargs:
         :return:
-        '''
+        """
         message = 'success'
         order_id = order_id
         error_message = f"Error in Cancelling Order {order_id}"
@@ -529,7 +529,6 @@ class All_Broker(main_broker.Broker):
                 self.log_this(error_message)
                 self.log_this(f"{str(sys.exc_info())}")
 
-
         elif self.broker_name.lower() == 'alice blue':
             try:
                 orders_history = self.get_order_book()
@@ -540,7 +539,6 @@ class All_Broker(main_broker.Broker):
                 message = str(sys.exc_info())
                 self.log_this(error_message)
                 self.log_this(f"{str(sys.exc_info())}")
-
 
         elif self.broker_name.lower() == 'angel':
             try:
@@ -557,10 +555,10 @@ class All_Broker(main_broker.Broker):
         return message
 
     def get_order_status(self, order_id):
-        '''
+        """
 
         :return:
-        '''
+        """
         order_status = None
         error_message = 'Error in getting Order Status'
         message = None
@@ -570,11 +568,15 @@ class All_Broker(main_broker.Broker):
 
                 order_history = pd.DataFrame(self.broker.orders())
                 order_status = order_history[order_history['order_id'] == str(order_id)]['status'].iloc[-1]
-                if order_status == 'OPEN':
-                    order_status = 'PENDING'
-
+                # if order_status == 'OPEN':
+                #     order_status = 'PENDING'
+                try:
+                    order_status = order_status.upper()
+                    if order_status == 'OPEN':
+                        order_status = 'PENDING'
+                except (TypeError, ValueError):
+                    order_status = ""
             except:
-
                 message = str(sys.exc_info())
                 self.log_this(error_message)
                 self.log_this(f"{str(sys.exc_info())}")
@@ -589,9 +591,12 @@ class All_Broker(main_broker.Broker):
                     order_status = 'complete'
                 if order_status.lower() == 'new':
                     order_status = 'pending'
-                if order_status.lower() in ['cancelled', 'rejected', 'complete', 'pending']:
+                # if order_status.lower() in ['cancelled', 'rejected', 'complete', 'pending']:
+                #     order_status = order_status.upper()
+                try:
                     order_status = order_status.upper()
-
+                except (TypeError, ValueError):
+                    order_status = ""
 
             except:
 
@@ -605,10 +610,14 @@ class All_Broker(main_broker.Broker):
                 order_history = pd.DataFrame(orders['data']['pending_orders'] + orders['data']['completed_orders'])
                 order_status = \
                     order_history[order_history['oms_order_id'].astype(str) == str(order_id)]['order_status'].iloc[-1]
-                if order_status == 'open':
+                if order_status.lower() == 'open':
                     order_status = 'pending'
-                if order_status in ['cancelled', 'rejected', 'complete', 'pending']:
+                # if order_status in ['cancelled', 'rejected', 'complete', 'pending']:
+                #     order_status = order_status.upper()
+                try:
                     order_status = order_status.upper()
+                except (TypeError, ValueError):
+                    order_status = ""
             except:
 
                 message = str(sys.exc_info())
@@ -619,10 +628,14 @@ class All_Broker(main_broker.Broker):
             try:
                 order_history = pd.DataFrame(self.broker.orderBook()['data'])
                 order_status = order_history[order_history['orderid'] == order_id]['status'].iloc[-1]
-                if order_status == 'open':
+                if order_status.lower() == 'open':
                     order_status = 'pending'
-                if order_status in ['cancelled', 'rejected', 'complete', 'pending']:
+                # if order_status in ['cancelled', 'rejected', 'complete', 'pending']:
+                #     order_status = order_status.upper()
+                try:
                     order_status = order_status.upper()
+                except (TypeError, ValueError):
+                    order_status = ""
             except:
 
                 message = str(sys.exc_info())

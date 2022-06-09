@@ -102,6 +102,8 @@ class Model_API_Det(QtCore.QAbstractTableModel):
     def setData(self, index: QtCore.QModelIndex, value: typing.Any, role: int = ...) -> bool:
         if index.isValid():
             if role == Qt.EditRole:
+                if isinstance(value, str):  # if value is a string
+                    value = value.strip()  # remove whitespaces and extra characters
                 self.data_list[index.row()][index.column()] = value
                 self.dataChanged.emit(index, index, [role])
                 return True

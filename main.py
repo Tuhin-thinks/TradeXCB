@@ -11,7 +11,6 @@ from Libs.UI import Interact, user_login
 from Libs.UI.CustomWidgets import (email_input_widget, security_question_widget, reset_password_dialog,
                                    DisclaimerDialog)
 from Libs.UI.Utils import field_validator
-from Libs.api_home import ApiHome
 from Libs.globals import *
 from Libs.icons_lib import Icons
 
@@ -45,11 +44,17 @@ class LoginWindow(QMainWindow):
         self.ui = user_login.Ui_MainWindow()
         self.ui.setupUi(self)
 
-        self.resize(self.width(), self.minimumHeight())
         icon = QtGui.QIcon(Icons.get_pixmap("APP_ICON"))
         self.setWindowIcon(icon)
         # move window to center of screen
-        QtWidgets.QApplication.desktop().rect().moveCenter(self.rect().center())
+        WIDTH = self.rect().width()
+        HEIGHT = self.minimumSizeHint().height()
+        self.resize(WIDTH, HEIGHT)
+        desktop = QtWidgets.QApplication.desktop().rect()
+        screenWidth = desktop.width()
+        screenHeight = desktop.height()
+        x, y = int((screenWidth - WIDTH) / 2), int((screenHeight - HEIGHT) / 4)
+        self.move(x, y)
         QtWidgets.QApplication.setWindowIcon(icon)
         self.setWindowIcon(icon)
 
@@ -557,6 +562,7 @@ class LoginWindow(QMainWindow):
         """
         :return: None
         """
+        from Libs.api_home import ApiHome
         self.home_window = ApiHome(self.geometry())
         self.home_window.window_closed.connect(self.update_logout_time)
         self.home_window.show()

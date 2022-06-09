@@ -426,7 +426,7 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                 manager_dict['algo_running'] = False
                 return
 
-        final_df = final_df[final_df['Row_Type'] != 'T']
+        final_df = final_df[final_df['Row_Type'] != 'T']  # keep only F type rows (reason?)
 
         for each_key in order_book_dict:
             try:
@@ -677,7 +677,7 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                                 try:
                                     new_order = dict(order)
                                     new_order['quantity'] = int(new_order['quantity'] * this_user['No of Lots'])
-                                    order_id, message = this_user['broker'].place_order(**new_order)
+                                    order_id, message = this_user['broker'].place_order(**new_order)  # placing fresh order
                                     this_instrument['entry_order_ids'][each_user]['order_id'] = order_id
                                     logger.info(f"Order Placed for {each_user} Order_id {order_id}")
                                 except:
@@ -832,8 +832,8 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                                      'tag': None}
 
                             for each_user in users_df_dict:
+                                this_user = users_df_dict[each_user]
                                 try:
-                                    this_user = users_df_dict[each_user]
                                     new_order = dict(order)
                                     new_order['quantity'] = int(new_order['quantity'] * this_user['No of Lots'])
                                     order_id, message = this_user['broker'].place_order(**new_order)
@@ -866,19 +866,23 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                         # Cancel Pending SL Order and Placing a Market Order
                         if paper_trade == 0:
                             for each_user in users_df_dict:
+                                this_user = users_df_dict[each_user]
                                 try:
-                                    this_user = users_df_dict[each_user]
                                     order_id = this_instrument['exit_order_ids'][each_user]['order_id']
                                     order_status, message = this_user['broker'].get_order_status(order_id)
                                     this_instrument['exit_order_ids'][each_user]['order_status'] = order_status
                                     if order_status == 'PENDING':
                                         this_user['broker'].cancel_order(order_id)
+                                        if this_instrument["transaction_type"] == "BUY":
+                                            txn_type = "SELL"
+                                        else:
+                                            txn_type = "BUY"
                                         order = {'variety': 'regular',
                                                  'exchange': this_instrument['exchange'],
                                                  'tradingsymbol': this_instrument['tradingsymbol'],
                                                  'quantity': int(this_instrument['quantity']),
                                                  'product': this_instrument['product_type'],
-                                                 'transaction_type': 'SELL',
+                                                 'transaction_type': txn_type,
                                                  'order_type': 'MARKET',
                                                  'price': None,
                                                  'validity': 'DAY',
@@ -940,12 +944,16 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                                     if order_status == 'PENDING':
                                         this_user['broker'].cancel_order(order_id)
                                         time.sleep(1)
+                                        if this_instrument["transaction_type"] == "BUY":
+                                            txn_type = "SELL"
+                                        else:
+                                            txn_type = "BUY"
                                         order = {'variety': 'regular',
                                                  'exchange': this_instrument['exchange'],
                                                  'tradingsymbol': this_instrument['tradingsymbol'],
                                                  'quantity': int(this_instrument['quantity']),
                                                  'product': this_instrument['product_type'],
-                                                 'transaction_type': 'SELL',
+                                                 'transaction_type': txn_type,
                                                  'order_type': 'MARKET',
                                                  'price': None,
                                                  'validity': 'DAY',
@@ -994,19 +1002,23 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                         # Cancel Pending SL Order and Placing a Market Order
                         if paper_trade == 0:
                             for each_user in users_df_dict:
+                                this_user = users_df_dict[each_user]
                                 try:
-                                    this_user = users_df_dict[each_user]
                                     order_id = this_instrument['exit_order_ids'][each_user]['order_id']
                                     order_status, message = this_user['broker'].get_order_status(order_id)
                                     this_instrument['exit_order_ids'][each_user]['order_status'] = order_status
                                     if order_status == 'PENDING':
                                         this_user['broker'].cancel_order(order_id)
+                                        if this_instrument['transaction_type'] == 'BUY':
+                                            txn_type = 'SELL'
+                                        else:
+                                            txn_type = 'BUY'
                                         order = {'variety': 'regular',
                                                  'exchange': this_instrument['exchange'],
                                                  'tradingsymbol': this_instrument['tradingsymbol'],
                                                  'quantity': int(this_instrument['quantity']),
                                                  'product': this_instrument['product_type'],
-                                                 'transaction_type': 'SELL',
+                                                 'transaction_type': txn_type,
                                                  'order_type': 'MARKET',
                                                  'price': None,
                                                  'validity': 'DAY',
@@ -1044,7 +1056,7 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                         this_instrument['sl_order_id'] = None
                         this_instrument['target_order_id'] = None
 
-                        # Cancel the SL Order placed and Place a opposite Limit Order which with Buffer and Close open position
+                        # Cancel the SL Order placed and Place an opposite Limit Order which with Buffer and Close open position
                         this_instrument['close_positions'] = 0
                         continue
             except Exception as e:
