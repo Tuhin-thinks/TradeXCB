@@ -2,10 +2,12 @@
 **.idea**
 **.zip
 .issues
-/sample_file_open.py
+.dump
 .mypy_cache
 **.log
 **.txt
 **.png
 **.csv
-**locorum**
+**locorum
+**Instruments.csv
+**test**
