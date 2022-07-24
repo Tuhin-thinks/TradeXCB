@@ -20,7 +20,7 @@ def download_master_file(xt):
                                      ' LotSize', 'Multiplier', 'UnderlyingInstrumentId', 'UnderlyingIndexName',
                                      'ContractExpiration', 'StrikePrice', 'OptionType'])
     master_file = final_df
-    master_file.to_csv("iifl.csv")
+    master_file.to_csv("iifl.csv")  # todo: change it to download at the right place and on required cases only
     return
 
 
