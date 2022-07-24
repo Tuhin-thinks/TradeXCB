@@ -60,3 +60,5 @@
   - [ ] create each row in **"Order Management"** table w.r.t. user x instrument times.
     ex. there are 10 users
     and 12 rows in trading symbol mapping table, then there'll be 10x12 = 120 rows (for all valid user accounts)
+- [x] remove iifl
+- [ ] remove alice blue
