@@ -1,8 +1,6 @@
 import datetime
 import json
-import os
 import sys
-import threading
 import urllib.parse as urlparse
 
 import pandas as pd
@@ -16,9 +14,7 @@ from kiteconnect import KiteConnect, KiteTicker
 from smartapi import SmartConnect
 
 # IIFL API
-from Libs.tradexcb_algo.Connect import XTSConnect
-from Libs.tradexcb_algo.MarketDataSocketClient import MDSocket_io
-from Libs.tradexcb_algo.main_broker_api import angel_helper, iifl_helper
+from Libs.tradexcb_algo.main_broker_api import angel_helper
 from Libs.tradexcb_algo.main_broker_api import main_broker
 
 Allcols = main_broker.Allcols
@@ -64,54 +60,6 @@ class All_Broker(main_broker.Broker):
         if self.broker_name.lower() == 'zerodha':
             return self.broker.ltp(f"{exchange}:{name}")[f"{exchange}:{name}"]['last_price']
 
-        if self.broker_name.lower() == 'iifl':
-            if name == 'NIFTY 50':
-                row = self.instrument_df[(self.instrument_df['name'] == 'NIFTY') & (
-                        self.instrument_df['instrument_type'] == 'FUT')].sort_values(by='expiry').head(1).iloc[-1]
-                name = row['tradingsymbol']
-                exchange = row['exchange']
-                instrument_token = int(row['instrument_token'])
-            elif name == 'NIFTY BANK':
-                row = self.instrument_df[(self.instrument_df['name'] == 'BANKNIFTY') & (
-                        self.instrument_df['instrument_type'] == 'FUT')].sort_values(by='expiry').head(1).iloc[-1]
-                name = row['tradingsymbol']
-                exchange = row['exchange']
-                instrument_token = int(row['instrument_token'])
-
-            instrument_row = self.instrument_df[self.instrument_df['instrument_token'] == instrument_token]
-            instrument_map = dict()
-            instrument_map[instrument_token] = iifl_helper.get_symbol_from_token(
-                instrument_row.iloc[-1]['exchange_token'], instrument_row.iloc[-1]['exchange'])
-            instrument_map[instrument_row.iloc[-1]['exchange_token']] = instrument_token
-            Instrument = [{'exchangeSegment': iifl_helper.get_exchange_number(instrument_row.iloc[-1]['exchange']),
-                           'exchangeInstrumentID': int(
-                               instrument_map[instrument_token].iloc[-1]['ExchangeInstrumentID'])}]
-            ltp = self.market_api.get_quote(Instrument, 1502, 'JSON')
-            ltp = json.loads(ltp['result']['listQuotes'][0])['Touchline']['LastTradedPrice']
-            return ltp
-
-    def get_ltp_vwap(self, tradingsymbols):
-        instrument_map = dict()
-        Instrument = list()
-        if self.broker_name.lower() == 'iifl':
-            for tradingsymbol in tradingsymbols:
-                instrument_row = self.instrument_df[self.instrument_df['tradingsymbol'] == tradingsymbol]
-                instrument_map[tradingsymbol] = iifl_helper.get_symbol_from_token(
-                    instrument_row.iloc[-1]['exchange_token'], instrument_row.iloc[-1]['exchange'])
-                instrument_map[instrument_row.iloc[-1][
-                    'exchange_token']] = f"{instrument_row.iloc[-1]['exchange']}:{tradingsymbol}"
-                Instrument.append(
-                    {'exchangeSegment': iifl_helper.get_exchange_number(instrument_row.iloc[-1]['exchange']),
-                     'exchangeInstrumentID': int(instrument_map[tradingsymbol].iloc[-1]['ExchangeInstrumentID'])})
-            ltp = self.market_api.get_quote(Instrument, 1502, 'JSON')
-            list_of_quotes = ltp['result']['listQuotes']
-            list_of_quotes = [json.loads(x) for x in list_of_quotes]
-            result = {instrument_map[x['ExchangeInstrumentID']]: {'last_price': x['Touchline']['LastTradedPrice'],
-                                                                  'average_price': x['Touchline']['AverageTradedPrice']}
-                      for x in list_of_quotes}
-
-            return result
-
     def get_live_ticks(self):
 
         if self.broker_name.lower() == 'zerodha':
@@ -156,82 +104,8 @@ class All_Broker(main_broker.Broker):
 
             return
 
-        if self.broker_name.lower() == 'iifl':
-
-            for each_instrument in self.instrument_list:
-                instrument_row = self.instrument_df[self.instrument_df['instrument_token'] == each_instrument]
-                self.instruments_map[each_instrument] = iifl_helper.get_symbol_from_token(
-                    instrument_row.iloc[-1]['exchange_token'], instrument_row.iloc[-1]['exchange'])
-                self.instruments_map[instrument_row.iloc[-1]['exchange_token']] = each_instrument
-                self.Instruments.append(
-                    {'exchangeSegment': iifl_helper.get_exchange_number(instrument_row.iloc[-1]['exchange']),
-                     'exchangeInstrumentID': int(
-                         self.instruments_map[each_instrument].iloc[-1]['ExchangeInstrumentID'])})
-
-            def on_connect():
-                """Connect from the socket."""
-                # response = xt.send_subscription(Instruments, 1505)
-                response = self.market_api.send_subscription(self.Instruments, 1501)
-                # response = self.market_api.send_subscription(self.Instruments, 1510)
-                # response = self.market_api.send_subscription(self.Instruments, 1502)
-                print('Sent Subscription request!', response)
-
-            def on_message(data):
-                print('I received a message!')
-                self.logger.info(f"Received a  message: {data}")
-                self.logger.info("The web socket was disconnected and is getting Connected Again Here: ")
-
-            def on_disconnect():
-                self.logger.info(f"Market Socket is Disconnected")
-                print('Market Data Socket disconnected!')
-
-            # Callback for error
-            def on_error(data):
-                """Error from the socket."""
-                self.logger.info(f"Market Data Error {data} ")
-
-            def on_message1501_json_full(data):
-                try:
-                    # print('I received a 1501 Level1,Touchline message!' + data)
-                    # self.logger.info(f"1501 Touchline Message Received: {data} {type(data)}")
-                    data = json.loads(data)
-                    # print(data)
-                    self.latest_ltp[self.instruments_map[data["ExchangeInstrumentID"]]]['ltp'] = data['Touchline'][
-                        'LastTradedPrice']
-
-                except:
-                    self.logger.info(f"Error in 1501 json full")
-
-            self.soc.on_connect = on_connect
-            self.soc.on_message = on_message
-            self.soc.on_message1501_json_full = on_message1501_json_full
-            self.soc.on_disconnect = on_disconnect
-            self.soc.on_error = on_error
-
-            # Event listener
-            self.el = self.soc.get_emitter()
-            self.el.on('connect', on_connect)
-            self.el.on('message', on_message)
-            self.el.on('1501-json-full', on_message1501_json_full)
-            threading.Thread(target=self.soc.connect).start()
-            # time.sleep(5)
-            return
-
     def subscribe_instrument(self, instrument_tokens):
-        if self.broker_name.lower() == 'iifl':
-            instrument_map = dict()
-            Instrument = list()
-            for tradingsymbol in instrument_tokens:
-                instrument_row = self.instrument_df[self.instrument_df['instrument_token'] == tradingsymbol]
-                instrument_map[tradingsymbol] = iifl_helper.get_symbol_from_token(
-                    instrument_row.iloc[-1]['exchange_token'], instrument_row.iloc[-1]['exchange'])
-                instrument_map[instrument_row.iloc[-1][
-                    'exchange_token']] = f"{instrument_row.iloc[-1]['exchange']}:{tradingsymbol}"
-                Instrument.append(
-                    {'exchangeSegment': iifl_helper.get_exchange_number(instrument_row.iloc[-1]['exchange']),
-                     'exchangeInstrumentID': int(instrument_map[tradingsymbol].iloc[-1]['ExchangeInstrumentID'])})
-            response = self.market_api.send_subscription(Instrument, 1501)
-        elif self.broker_name.lower() == 'zerodha':
+        if self.broker_name.lower() == 'zerodha':
             self.web_socket.subscribe(instrument_tokens)
             self.web_socket.set_mode(self.web_socket.MODE_FULL, instrument_tokens)
 
@@ -299,30 +173,6 @@ class All_Broker(main_broker.Broker):
                 self.broker = None
                 self.log_this(f"Error in logging in for {username} Broker : {self.broker_name}"
                               f" Error : {sys.exc_info()}")
-
-
-        elif self.broker_name.lower() == 'iifl':
-            try:
-                self.market_api = XTSConnect(market_appkey, market_secretkey, source)
-                response = self.market_api.marketdata_login()
-                # iifl_helper.download_master_file(self.market_api)
-                # print(self.broker.get_profile())
-                self.broker = XTSConnect(apikey, secretkey, source, host)
-
-                self.market_token = response['result']['token']
-                print(f"Token : {self.market_token}")
-                self.userid = response['result']['userID']
-                self.soc = MDSocket_io(self.market_token, self.userid)
-                self.broker.interactive_login()
-                # sys.exit(0)
-                # Connecting to Marketdata socket
-                iifl_helper.download_master_file(self.market_api)
-
-            except:
-                self.broker = None
-                self.log_this(
-                    f"Error in logging in for {username} Broker : {self.broker_name} Error : {sys.exc_info()}")
-
 
         elif self.broker_name.lower() == 'alice blue':
             try:
@@ -396,31 +246,6 @@ class All_Broker(main_broker.Broker):
                                                    trailing_stoploss=None if 'trailing_stoploss' not in kwargs else
                                                    kwargs['trailing_stoploss'],
                                                    tag=None)
-            except:
-                order_id = None
-                message = str(sys.exc_info())
-                self.log_this(f"Error in Order Placement ")
-                self.log_this(f"{str(sys.exc_info())}")
-
-
-        elif self.broker_name.lower() == 'iifl':
-            exchange_map = {'NSE': self.broker.EXCHANGE_NSECM, 'NFO': self.broker.EXCHANGE_NSEFO}
-            order_map = {'MARKET': 'MARKET', 'LIMIT': 'LIMIT', 'SL-M': "STOPMARKET", 'SL': "STOPLIMIT"}
-
-            try:
-                response = self.broker.place_order(
-                    exchangeSegment=exchange_map[kwargs['exchange']],
-                    exchangeInstrumentID=int(instrument_row['exchange_token'].iloc[-1]),
-                    productType=kwargs['product'],
-                    orderType=order_map[kwargs['order_type']],
-                    orderSide=kwargs['transaction_type'],
-                    timeInForce=kwargs['validity'],
-                    disclosedQuantity=0 if kwargs['disclosed_quantity'] is None else kwargs['disclosed_quantity'],
-                    orderQuantity=kwargs['quantity'],
-                    limitPrice=0 if kwargs['price'] is None or 'price' not in kwargs else kwargs['price'],
-                    stopPrice=0 if kwargs['trigger_price'] is None else kwargs['trigger_price'],
-                    orderUniqueIdentifier="454845")
-                order_id = response['result']['AppOrderID']
             except:
                 order_id = None
                 message = str(sys.exc_info())
@@ -517,18 +342,6 @@ class All_Broker(main_broker.Broker):
                 self.log_this(error_message)
                 self.log_this(f"{str(sys.exc_info())}")
 
-        elif self.broker_name.lower() == 'iifl':
-            try:
-                order_history = pd.DataFrame(self.broker.get_order_book()['result'])
-                order_row = order_history[order_history['AppOrderID'].astype(str) == str(order_id)]
-                self.broker.cancel_order(appOrderID=order_id,
-                                         orderUniqueIdentifier=order_row.iloc[-1]['OrderUniqueIdentifier'])
-            except:
-                order_id = None
-                message = str(sys.exc_info())
-                self.log_this(error_message)
-                self.log_this(f"{str(sys.exc_info())}")
-
         elif self.broker_name.lower() == 'alice blue':
             try:
                 orders_history = self.get_order_book()
@@ -577,29 +390,6 @@ class All_Broker(main_broker.Broker):
                 except (TypeError, ValueError):
                     order_status = ""
             except:
-                message = str(sys.exc_info())
-                self.log_this(error_message)
-                self.log_this(f"{str(sys.exc_info())}")
-
-        elif self.broker_name.lower() == 'iifl':
-            try:
-
-                order_history = pd.DataFrame(self.broker.get_order_book()['result'])
-                order_status = \
-                    order_history[order_history['AppOrderID'].astype(str) == str(order_id)]['OrderStatus'].iloc[-1]
-                if order_status.lower() == 'filled':
-                    order_status = 'complete'
-                if order_status.lower() == 'new':
-                    order_status = 'pending'
-                # if order_status.lower() in ['cancelled', 'rejected', 'complete', 'pending']:
-                #     order_status = order_status.upper()
-                try:
-                    order_status = order_status.upper()
-                except (TypeError, ValueError):
-                    order_status = ""
-
-            except:
-
                 message = str(sys.exc_info())
                 self.log_this(error_message)
                 self.log_this(f"{str(sys.exc_info())}")
@@ -655,17 +445,6 @@ class All_Broker(main_broker.Broker):
 
             except:
                 message = str(sys.exc_info())
-                self.log_this(error_message)
-                self.log_this(f"{str(sys.exc_info())}")
-
-        elif self.broker_name.lower() == 'iifl':
-            try:
-
-                order_history = pd.DataFrame(self.broker.get_order_book()['result'])
-                return order_history
-
-
-            except:
                 self.log_this(error_message)
                 self.log_this(f"{str(sys.exc_info())}")
 
@@ -731,43 +510,6 @@ class All_Broker(main_broker.Broker):
                 message = 'success'
             except Exception as e:
                 self.logger.critical(f"Error is getting data: {str(e)}", exc_info=True)
-
-        elif self.broker_name.lower() == 'iifl':
-            # instrument_iifl_row = iifl_helper.get_symbol_from_token(instrument_row.iloc[-1]['exchange_token'],instrument_row.iloc[-1]['exchange'])
-            import datetime
-            to_dt = datetime.datetime.now()
-            from_dt = to_dt - datetime.timedelta(days=5)
-            to_dt = int(to_dt.timestamp())
-            from_dt = int(from_dt.timestamp())
-            try:
-                res = self.broker.get_ohlc(
-                    exchangeSegment=int(iifl_helper.get_exchange_number(instrument_row.iloc[-1]['exchange'])),
-                    exchangeInstrumentID=int(instrument_row.iloc[-1]['exchange_token']), startTime=from_dt,
-                    endTime=to_dt, compressionValue=int(timeframe) * 60)
-                res = res['result']['dataReponse']
-                res = res.split(',')
-                final_res = []
-                for each_elem in res:
-                    final_res.append(each_elem.split('|'))
-
-                df = pd.DataFrame(final_res,
-                                  columns=['time', 'open', 'high', 'low', 'close', 'volume', 'open_interest', 'None'])
-                df = df[['time', 'open', 'high', 'low', 'close', 'volume', 'open_interest']]
-                df['time'] = pd.to_datetime(df['time'], unit='s')
-                df['time'] = df['time'].apply(lambda x: x.replace(second=0))
-                df['date'] = df['time'] + pd.Timedelta(minutes=int(int(timeframe) * 60 / 60))
-                df['open'] = df['open'].astype(float)
-                df['high'] = df['high'].astype(float)
-                df['low'] = df['low'].astype(float)
-                df['close'] = df['close'].astype(float)
-                df['volume'] = df['volume'].astype(int)
-                df.index = df['date']
-                return df
-            except:
-                message = str(sys.exc_info())
-                self.log_this(error_message)
-                self.log_this(f"{str(sys.exc_info())}")
-
         return df, message
 
     def log_this(self, log_message, log_level='error'):
