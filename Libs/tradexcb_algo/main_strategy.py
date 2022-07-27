@@ -34,6 +34,13 @@ to_dt = to_dt.strftime('%Y-%m-%d')
 datetime_format = '%Y-%m-%d %H:%M:%S'
 
 
+def reverse_txn_type(transaction_type: str) -> str:
+    if transaction_type.lower() is "sell":
+        return "BUY"
+    else:
+        return "SELL"
+
+
 def get_vwap(df: pd.DataFrame):
     try:
         print(df.columns)
@@ -637,9 +644,13 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                             this_instrument['tick_size'])
                         this_instrument['entry_time'] = datetime.now()
                         if this_instrument['target_type'].lower() == 'percentage':
-                            this_instrument['target_price'] = fix_values(this_instrument['entry_price'] * (1 + this_instrument['target'] / 100), this_instrument['tick_size'])
+                            this_instrument['target_price'] = fix_values(
+                                this_instrument['entry_price'] * (1 + this_instrument['target'] / 100),
+                                this_instrument['tick_size'])
                         elif this_instrument['target_type'].lower() == 'value':
-                            this_instrument['target_price'] = fix_values(this_instrument['entry_price'] + this_instrument['target'], this_instrument['tick_size'])
+                            this_instrument['target_price'] = fix_values(
+                                this_instrument['entry_price'] + this_instrument['target'],
+                                this_instrument['tick_size'])
 
                         if this_instrument['stoploss_type'].lower() == 'percentage':
                             this_instrument['sl_price'] = fix_values(
@@ -814,7 +825,7 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                                      'tradingsymbol': this_instrument['tradingsymbol'],
                                      'quantity': int(this_instrument['quantity']),
                                      'product': this_instrument['product_type'],
-                                     'transaction_type': 'SELL',
+                                     'transaction_type': reverse_txn_type(this_instrument['transaction_type']),
                                      'order_type': 'SL',
                                      'price': this_instrument['sl_price'],
                                      'validity': 'DAY',
@@ -1005,10 +1016,7 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                                     this_instrument['exit_order_ids'][each_user]['order_status'] = order_status
                                     if order_status == 'PENDING':
                                         this_user['broker'].cancel_order(order_id)
-                                        if this_instrument['transaction_type'] == 'BUY':
-                                            txn_type = 'SELL'
-                                        else:
-                                            txn_type = 'BUY'
+                                        txn_type = reverse_txn_type(this_instrument['transaction_type'])
                                         order = {'variety': 'regular',
                                                  'exchange': this_instrument['exchange'],
                                                  'tradingsymbol': this_instrument['tradingsymbol'],
