@@ -252,7 +252,6 @@ class All_Broker(main_broker.Broker):
                 self.log_this(f"Error in Order Placement ")
                 self.log_this(f"{str(sys.exc_info())}")
 
-
         elif self.broker_name.lower() == 'alice blue':
             transaction_map = {'BUY': TransactionType.Buy, 'SELL': TransactionType.Sell}
             order_map = {'MARKET': OrderType.Market, 'LIMIT': OrderType.Limit, 'SL-M': OrderType.StopLossMarket,
@@ -289,6 +288,10 @@ class All_Broker(main_broker.Broker):
             product_map = {'MIS': 'INTRADAY', 'NRML': 'CARRYFORWARD', 'CNC': 'DELIVERY'}
             order_map = {'MARKET': 'MARKET', 'LIMIT': 'LIMIT', 'SL': 'STOPLOSS_LIMIT', 'SL-M': 'STOPLOSS_MARKET'}
             variety = 'NORMAL' if kwargs['order_type'] in ['LIMIT', 'MARKET'] else 'STOPLOSS'
+            if kwargs['order_type'] == 'MARKET' or kwargs['price'] is None:
+                price = "0"
+            else:
+                price = str(kwargs['price'])
             try:
                 orderparams = {
                     "variety": variety,
@@ -300,7 +303,7 @@ class All_Broker(main_broker.Broker):
                     "ordertype": order_map[kwargs['order_type']],
                     "producttype": product_map[kwargs['product']],
                     "duration": kwargs['validity'],
-                    "price": "0" if kwargs['price'] is None else str(kwargs['price']),
+                    "price": price,
                     "squareoff": "0" if 'squareoff' not in kwargs or kwargs['squareoff'] is None else str(
                         kwargs['squareoff']),
                     "stoploss": "0" if 'stoploss' not in kwargs or kwargs['stoploss'] is None else str(
