@@ -35,7 +35,8 @@ datetime_format = '%Y-%m-%d %H:%M:%S'
 
 
 def reverse_txn_type(transaction_type: str) -> str:
-    if transaction_type.lower() is "sell":
+    logger.debug(f"transaction type for reverse:{transaction_type}")
+    if transaction_type.lower() == "sell":
         return "BUY"
     else:
         return "SELL"
