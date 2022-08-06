@@ -832,8 +832,7 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                                      'validity': 'DAY',
                                      'disclosed_quantity': None,
                                      'trigger_price': this_instrument['sl_price'] - this_instrument['tick_size'] if
-                                     this_instrument['transaction_type'] == 'BUY' else this_instrument['sl_price'] + 1 *
-                                                                                       this_instrument['tick_size'],
+                                     this_instrument['transaction_type'] == 'BUY' else this_instrument['sl_price'] + this_instrument['tick_size'],
                                      'squareoff': None,
                                      'stoploss': None,
                                      'trailing_stoploss': None,
