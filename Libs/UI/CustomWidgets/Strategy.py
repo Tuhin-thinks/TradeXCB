@@ -1,10 +1,6 @@
-from datetime import datetime
-
-import pandas as pd
 from PyQt5 import QtWidgets, QtGui, QtCore
 
 from Libs.Files.TradingSymbolMapping import StrategiesColumn
-from Libs.UI.CustomWidgets.StrategyBuilderDialog import StrategyBuilder
 from Libs.UI.CustomWidgets.TradingSymbolTable import StrategyView
 from Libs.UI.Interact import message
 from Libs.globals import *
