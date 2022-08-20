@@ -88,7 +88,8 @@
       "dropdown": true,
       "dropdown_values": [
          "Value",
-         "Percentage"
+         "Percentage",
+         "No SL Order"
       ]
    },
    "stoploss": {
@@ -112,7 +113,8 @@
       "dropdown": true,
       "dropdown_values": [
          "Value",
-         "Percentage"
+         "Percentage",
+         "No Target Order"
       ]
    },
    "target": {

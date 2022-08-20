@@ -640,40 +640,42 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                             logger.info(f" Entry has been taken for {this_instrument['tradingsymbol']} ")
                             this_instrument['entry_time'] = datetime.now()
                             this_instrument['status'] = 2
-                            # Place SL Order
-                            order = {'variety': 'regular',
-                                     'exchange': this_instrument['exchange'],
-                                     'tradingsymbol': this_instrument['tradingsymbol'],
-                                     'quantity': int(this_instrument['quantity']),
-                                     'product': this_instrument['product_type'],
-                                     'transaction_type': calculations.reverse_txn_type(
-                                         this_instrument['transaction_type']),
-                                     'order_type': 'SL',
-                                     'price': this_instrument['sl_price'],
-                                     'validity': 'DAY',
-                                     'disclosed_quantity': None,
-                                     'trigger_price': calculations.get_adjusted_trigger_price(
-                                         this_instrument['transaction_type'],
-                                         this_instrument['sl_price'],
-                                         this_instrument['tick_size']),
-                                     'squareoff': None,
-                                     'stoploss': None,
-                                     'trailing_stoploss': None,
-                                     'tag': None}
 
-                            for each_user in users_df_dict:
-                                this_user = users_df_dict[each_user]
-                                try:
-                                    new_order = dict(order)
-                                    new_order['quantity'] = int(new_order['quantity'] * this_user['No of Lots'])
-                                    order_id, message = this_user['broker'].place_order(**new_order)
-                                    this_instrument['exit_order_ids'][each_user]['order_id'] = order_id
-                                    logger.info(f"Order Placed for {each_user} Order_id {order_id}")
-                                except:
-                                    logger.critical(f"Error in SL Order Placement for {this_user['Name']} "
-                                                    f"Error {sys.exc_info()}", exc_info=True)
+                            if this_instrument['stoploss_type'] != 'No SL Order':
+                                # Place SL Order
+                                order = {'variety': 'regular',
+                                         'exchange': this_instrument['exchange'],
+                                         'tradingsymbol': this_instrument['tradingsymbol'],
+                                         'quantity': int(this_instrument['quantity']),
+                                         'product': this_instrument['product_type'],
+                                         'transaction_type': calculations.reverse_txn_type(
+                                             this_instrument['transaction_type']),
+                                         'order_type': 'SL',
+                                         'price': this_instrument['sl_price'],
+                                         'validity': 'DAY',
+                                         'disclosed_quantity': None,
+                                         'trigger_price': calculations.get_adjusted_trigger_price(
+                                             this_instrument['transaction_type'],
+                                             this_instrument['sl_price'],
+                                             this_instrument['tick_size']),
+                                         'squareoff': None,
+                                         'stoploss': None,
+                                         'trailing_stoploss': None,
+                                         'tag': None}
 
-                            continue
+                                for each_user in users_df_dict:
+                                    this_user = users_df_dict[each_user]
+                                    try:
+                                        new_order = dict(order)
+                                        new_order['quantity'] = int(new_order['quantity'] * this_user['No of Lots'])
+                                        order_id, message = this_user['broker'].place_order(**new_order)
+                                        this_instrument['exit_order_ids'][each_user]['order_id'] = order_id
+                                        logger.info(f"Order Placed for {each_user} Order_id {order_id}")
+                                    except:
+                                        logger.critical(f"Error in SL Order Placement for {this_user['Name']} "
+                                                        f"Error {sys.exc_info()}", exc_info=True)
+
+                                continue
 
                 if this_instrument['status'] == 2:  # Order Placed was executed
                     this_instrument['ltp'] = ltp
@@ -685,7 +687,7 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
 
                     # logger.info(f"{ltp} {this_instrument['multiplier']} {this_instrument['target_price']} {this_instrument['sl_price']}")
                     if ltp * this_instrument['multiplier'] >= (this_instrument['target_price'] *
-                                                               this_instrument['multiplier']):
+                                                               this_instrument['multiplier']) and this_instrument['target_type'] != 'No Target Order':
                         logger.info(f"Target has been Hit for {this_instrument['tradingsymbol']}")
                         this_instrument['exit_time'] = datetime.now()
                         this_instrument['exit_price'] = ltp
