@@ -1,3 +1,4 @@
+from hashlib import md5
 from datetime import datetime
 
 import numpy as np
@@ -105,3 +106,7 @@ def get_default_entry_time():
         return _9_15
     else:
         return datetime.now().strftime("%H.%M.%S")
+
+
+def get_symbol_hash(symbol_str: str, key_factor: str):
+    return md5(symbol_str + key_factor).hexdigest()

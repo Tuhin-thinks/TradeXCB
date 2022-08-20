@@ -1,0 +1,3 @@
+[submodule "Libs/tradexcb_algo/Brokers"]
+	path = Libs/tradexcb_algo/Brokers
+	url = https://github.com/AlgoBeacon-Investing-Technologies-Tech/BrokerMapping.git
