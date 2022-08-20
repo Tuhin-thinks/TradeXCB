@@ -42,6 +42,13 @@ def reverse_txn_type(transaction_type: str) -> str:
         return "SELL"
 
 
+def get_adjusted_trigger_price(transaction_type: str, sl_price: float, tick_size: int) -> float:
+    if transaction_type == 'BUY':
+        return sl_price - tick_size * 4
+    else:
+        return sl_price + tick_size * 4
+
+
 def get_vwap(df: pd.DataFrame):
     try:
         print(df.columns)
@@ -386,10 +393,9 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
         if datetime.now() < nine_sixteen:
             continue
 
-        final_df = final_df[
-            ['tradingsymbol', 'exchange', 'quantity', 'timeframe', 'multiplier', 'entry_price', 'entry_time',
-             'exit_price', 'exit_time'
-                , 'target_price', 'sl_price', 'Row_Type', 'profit', 'ltp']]
+        final_df = final_df[['tradingsymbol', 'exchange', 'quantity', 'timeframe', 'multiplier', 'entry_price',
+                             'entry_time', 'exit_price', 'exit_time', 'target_price', 'sl_price', 'Row_Type',
+                             'profit', 'ltp']]
         final_df['Trend'] = np.where(final_df['multiplier'] == 1, 'BUY', 'SELL')
 
         final_all_user_df = pd.DataFrame()
@@ -685,7 +691,8 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                                 try:
                                     new_order = dict(order)
                                     new_order['quantity'] = int(new_order['quantity'] * this_user['No of Lots'])
-                                    order_id, message = this_user['broker'].place_order(**new_order)  # placing fresh order
+                                    order_id, message = this_user['broker'].place_order(
+                                        **new_order)  # placing fresh order
                                     this_instrument['entry_order_ids'][each_user]['order_id'] = order_id
                                     logger.info(f"Order Placed for {each_user} Order_id {order_id}")
                                 except:
@@ -831,8 +838,9 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                                      'price': this_instrument['sl_price'],
                                      'validity': 'DAY',
                                      'disclosed_quantity': None,
-                                     'trigger_price': this_instrument['sl_price'] - this_instrument['tick_size'] if
-                                     this_instrument['transaction_type'] == 'BUY' else this_instrument['sl_price'] + this_instrument['tick_size'],
+                                     'trigger_price': get_adjusted_trigger_price(this_instrument['transaction_type'],
+                                                                                 this_instrument['sl_price'],
+                                                                                 this_instrument['tick_size']),
                                      'squareoff': None,
                                      'stoploss': None,
                                      'trailing_stoploss': None,

@@ -3,6 +3,7 @@
 **.zip
 .issues
 .dump
+.backup
 .mypy_cache
 **.log
 **.txt
@@ -10,4 +11,4 @@
 **.csv
 **locorum
 **Instruments.csv
-**test**
+test**
