@@ -2,9 +2,14 @@ from datetime import datetime
 
 import numpy as np
 from Libs.Utils import settings
+import pandas as pd
 from Libs.globals import *
 import hashlib
 import json
+
+from Libs.Utils.exception_handler import getAlgoLogger
+
+logger = getAlgoLogger(__name__)
 
 nine_fifteen = datetime.today().replace(hour=9, minute=15, second=0, microsecond=0)  # start time
 three_35 = datetime.today().replace(hour=15, minute=35, second=0, microsecond=0)  # stop time
@@ -105,3 +110,42 @@ def get_default_entry_time():
         return _9_15
     else:
         return datetime.now().strftime("%H.%M.%S")
+
+
+def reverse_txn_type(transaction_type: str) -> str:
+    logger.debug(f"transaction type for reverse:{transaction_type}")
+    if transaction_type.lower() == "sell":
+        return "BUY"
+    else:
+        return "SELL"
+
+
+def get_adjusted_trigger_price(transaction_type: str, sl_price: float, tick_size: int) -> float:
+    if transaction_type == 'BUY':
+        return sl_price - tick_size * 4
+    else:
+        return sl_price + tick_size * 4
+
+
+def get_vwap(df: pd.DataFrame):
+    try:
+        print(df.columns)
+        df['time'] = df.index
+        columns_df = list(df.columns)
+        columns_df.append('vwap')
+        df['Quantity_Rolling_Sum'] = df.groupby(df['time'].dt.date)['volume'].cumsum()
+        df['PriceXVolume'] = (df['HA_close'] + df['HA_high'] + df['HA_low']) / 3 * df['volume']
+        df['PriceXVolumeCUMSUM'] = df.groupby(df['time'].dt.date)['PriceXVolume'].cumsum()
+        df['vwap'] = df['PriceXVolumeCUMSUM'] / df['Quantity_Rolling_Sum']
+        df = df[columns_df]
+        return df
+    except Exception as e:
+        logger.exception(f"Exception in calculation VWAP: {e.__str__()}", exc_info=True)
+
+
+def fix_values(value, tick_size):
+    return round(int(value / tick_size) * tick_size, len(str(tick_size)))
+
+
+def do_assertion(name, variable):
+    assert variable is not None, f"Variable {name} is None"

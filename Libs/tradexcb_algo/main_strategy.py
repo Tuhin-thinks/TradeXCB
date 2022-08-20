@@ -15,9 +15,10 @@ import talib
 from Libs.Files import handle_user_details
 from Libs.Files.TradingSymbolMapping import StrategiesColumn
 from Libs.Storage import app_data
-from Libs.Utils import settings, exception_handler
+from Libs.Utils import settings, exception_handler, calculations
 from .TA_Lib import HA
 from .main_broker_api.All_Broker import All_Broker
+from .static import ta_lib_ext
 
 pd.set_option('expand_frame_repr', False)
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -32,194 +33,6 @@ to_dt = datetime.now()
 from_dt = to_dt - timedelta(days=5)
 to_dt = to_dt.strftime('%Y-%m-%d')
 datetime_format = '%Y-%m-%d %H:%M:%S'
-
-
-def reverse_txn_type(transaction_type: str) -> str:
-    logger.debug(f"transaction type for reverse:{transaction_type}")
-    if transaction_type.lower() == "sell":
-        return "BUY"
-    else:
-        return "SELL"
-
-
-def get_adjusted_trigger_price(transaction_type: str, sl_price: float, tick_size: int) -> float:
-    if transaction_type == 'BUY':
-        return sl_price - tick_size * 4
-    else:
-        return sl_price + tick_size * 4
-
-
-def get_vwap(df: pd.DataFrame):
-    try:
-        print(df.columns)
-        df['time'] = df.index
-        columns_df = list(df.columns)
-        columns_df.append('vwap')
-        df['Quantity_Rolling_Sum'] = df.groupby(df['time'].dt.date)['volume'].cumsum()
-        df['PriceXVolume'] = (df['HA_close'] + df['HA_high'] + df['HA_low']) / 3 * df['volume']
-        df['PriceXVolumeCUMSUM'] = df.groupby(df['time'].dt.date)['PriceXVolume'].cumsum()
-        df['vwap'] = df['PriceXVolumeCUMSUM'] / df['Quantity_Rolling_Sum']
-        df = df[columns_df]
-        return df
-    except:
-        print(sys.exc_info())
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(exc_type, fname, exc_tb.tb_lineno)
-
-
-def fix_values(value, tick_size):
-    return round(int(value / tick_size) * tick_size, len(str(tick_size)))
-
-
-def EMA(df, base, target, period, alpha=False):
-    """
-    Function to compute Exponential Moving Average (EMA)
-
-    Args :
-        df : Pandas DataFrame which contains ['date', 'open', 'high', 'low', 'close', 'volume'] columns
-        base : String indicating the column name from which the EMA needs to be computed from
-        target : String indicates the column name to which the computed data needs to be stored
-        period : Integer indicates the period of computation in terms of number of candles
-        alpha : Boolean if True indicates to use the formula for computing EMA using alpha (default is False)
-
-    Returns :
-        df : Pandas DataFrame with new column added with name 'target'
-    """
-
-    con = pd.concat([df[:period][base].rolling(window=period).mean(), df[period:][base]])
-
-    if (alpha == True):
-        # (1 - alpha) * previous_val + alpha * current_val where alpha = 1 / period
-        df[target] = con.ewm(alpha=1 / period, adjust=False).mean()
-    else:
-        # ((current_val - previous_val) * coeff) + previous_val where coeff = 2 / (period + 1)
-        df[target] = con.ewm(span=period, adjust=False).mean()
-
-    df[target].fillna(0, inplace=True)
-    return df
-
-
-def ATR(df, period, ohlc=['Open', 'High', 'Low', 'Close']):
-    """
-    Function to compute Average True Range (ATR)
-
-    Args :
-        df : Pandas DataFrame which contains ['date', 'open', 'high', 'low', 'close', 'volume'] columns
-        period : Integer indicates the period of computation in terms of number of candles
-        ohlc: List defining OHLC Column names (default ['Open', 'High', 'Low', 'Close'])
-
-    Returns :
-        df : Pandas DataFrame with new columns added for
-            True Range (TR)
-            ATR (ATR_$period)
-    """
-    atr = 'ATR_' + str(period)
-
-    # Compute true range only if it is not computed and stored earlier in the df
-    if not 'TR' in df.columns:
-        df['h-l'] = df[ohlc[1]] - df[ohlc[2]]
-        df['h-yc'] = abs(df[ohlc[1]] - df[ohlc[3]].shift())
-        df['l-yc'] = abs(df[ohlc[2]] - df[ohlc[3]].shift())
-
-        df['TR'] = df[['h-l', 'h-yc', 'l-yc']].max(axis=1)
-
-        df.drop(['h-l', 'h-yc', 'l-yc'], inplace=True, axis=1)
-
-    # Compute EMA of true range using ATR formula after ignoring first row
-    EMA(df, 'TR', atr, period, alpha=True)
-
-    return df
-
-
-def SuperTrend(df, period, multiplier, ohlc=['Open', 'High', 'Low', 'Close']):
-    """
-    Function to compute SuperTrend
-
-    Args :
-        df : Pandas DataFrame which contains ['date', 'open', 'high', 'low', 'close', 'volume'] columns
-        period : Integer indicates the period of computation in terms of number of candles
-        multiplier : Integer indicates value to multiply the ATR
-        ohlc: List defining OHLC Column names (default ['Open', 'High', 'Low', 'Close'])
-
-    Returns :
-        df : Pandas DataFrame with new columns added for
-            True Range (TR), ATR (ATR_$period)
-            SuperTrend (ST_$period_$multiplier)
-            SuperTrend Direction (STX_$period_$multiplier)
-    """
-    try:
-        ATR(df, period, ohlc=ohlc)
-        atr = 'ATR_' + str(period)
-        st = 'ST_' + str(period) + '_' + str(multiplier)
-        stx = 'STX_' + str(period) + '_' + str(multiplier)
-
-        """
-        SuperTrend Algorithm :
-
-            BASIC UPPERBAND = (HIGH + LOW) / 2 + Multiplier * ATR
-            BASIC LOWERBAND = (HIGH + LOW) / 2 - Multiplier * ATR
-
-            FINAL UPPERBAND = IF( (Current BASICUPPERBAND < Previous FINAL UPPERBAND) or (Previous Close > Previous FINAL UPPERBAND))
-                                THEN (Current BASIC UPPERBAND) ELSE Previous FINALUPPERBAND)
-            FINAL LOWERBAND = IF( (Current BASIC LOWERBAND > Previous FINAL LOWERBAND) or (Previous Close < Previous FINAL LOWERBAND)) 
-                                THEN (Current BASIC LOWERBAND) ELSE Previous FINAL LOWERBAND)
-
-            SUPERTREND = IF((Previous SUPERTREND = Previous FINAL UPPERBAND) and (Current Close <= Current FINAL UPPERBAND)) THEN
-                            Current FINAL UPPERBAND
-                        ELSE
-                            IF((Previous SUPERTREND = Previous FINAL UPPERBAND) and (Current Close > Current FINAL UPPERBAND)) THEN
-                                Current FINAL LOWERBAND
-                            ELSE
-                                IF((Previous SUPERTREND = Previous FINAL LOWERBAND) and (Current Close >= Current FINAL LOWERBAND)) THEN
-                                    Current FINAL LOWERBAND
-                                ELSE
-                                    IF((Previous SUPERTREND = Previous FINAL LOWERBAND) and (Current Close < Current FINAL LOWERBAND)) THEN
-                                        Current FINAL UPPERBAND
-        """
-
-        # Compute basic upper and lower bands
-        df['basic_ub'] = (df[ohlc[3]] + df[ohlc[3]]) / 2 + multiplier * df[atr]
-        df['basic_lb'] = (df[ohlc[3]] + df[ohlc[3]]) / 2 - multiplier * df[atr]
-
-        # Compute final upper and lower bands
-        df['final_ub'] = 0.00
-        df['final_lb'] = 0.00
-
-        for i in range(period, len(df)):
-            df['final_ub'].iat[i] = df['basic_ub'].iat[i] if df['basic_ub'].iat[i] < df['final_ub'].iat[
-                i - 1] or df[ohlc[3]].iat[i - 1] > df['final_ub'].iat[i - 1] else df['final_ub'].iat[
-                i - 1]
-            df['final_lb'].iat[i] = df['basic_lb'].iat[i] if df['basic_lb'].iat[i] > df['final_lb'].iat[
-                i - 1] or df[ohlc[3]].iat[i - 1] < df['final_lb'].iat[i - 1] else df['final_lb'].iat[
-                i - 1]
-
-        # Set the Supertrend value
-        df[st] = 0.00
-        for i in range(period, len(df)):
-            df[st].iat[i] = df['final_ub'].iat[i] if df[st].iat[i - 1] == df['final_ub'].iat[i - 1] and \
-                                                     df[ohlc[3]].iat[i] <= df['final_ub'].iat[i] else \
-                df['final_lb'].iat[i] if df[st].iat[i - 1] == df['final_ub'].iat[i - 1] and \
-                                         df[ohlc[3]].iat[i] > df['final_ub'].iat[i] else \
-                    df['final_lb'].iat[i] if df[st].iat[i - 1] == df['final_lb'].iat[i - 1] and \
-                                             df[ohlc[3]].iat[i] >= df['final_lb'].iat[i] else \
-                        df['final_ub'].iat[i] if df[st].iat[i - 1] == df['final_lb'].iat[i - 1] and \
-                                                 df[ohlc[3]].iat[i] < df['final_lb'].iat[i] else 0.00
-
-            # Mark the trend direction up/down
-        df['SUPERTREND'] = np.where((df[st] > 0.00), np.where((df[ohlc[3]] < df[st]), 'down', 'up'), np.NaN)
-
-        # Remove basic and final bands from the columns
-        df.drop(['basic_ub', 'basic_lb', 'final_ub', 'final_lb'], inplace=True, axis=1)
-
-        df.fillna(0, inplace=True)
-        return df['SUPERTREND']
-    except Exception as e:
-        logger.error(f'Error in SuperTrend Calculation {sys.exc_info()}', exc_info=True)
-
-
-def do_assertion(name, variable):
-    assert variable is not None, f"Variable {name} is None"
 
 
 # ------------ function to add new rows in run-time ------------
@@ -530,10 +343,10 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                     df = HA(df, ohlc=['open', 'high', 'low', 'close'])
                     # print(df.tail(5))  # TODO: Remove this
                     df.index = time_df_col
-                    df = get_vwap(df)
-                    df['SUPERTREND'] = SuperTrend(df, this_instrument['ATR TS Period'],
-                                                  this_instrument['ATR TS Multiplier'],
-                                                  ohlc=['HA_open', 'HA_high', 'HA_low', 'HA_close'])
+                    df = calculations.get_vwap(df)
+                    df['SUPERTREND'] = ta_lib_ext.SuperTrend(df, this_instrument['ATR TS Period'],
+                                                             this_instrument['ATR TS Multiplier'],
+                                                             ohlc=['HA_open', 'HA_high', 'HA_low', 'HA_close'])
                     this_instrument['vwap_last'] = df['vwap'].tail(2).head(1).values[0]
                     vwap = df['vwap'].tail(1).values[0]
 
@@ -646,26 +459,26 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                         this_instrument['status'] = 1
                         this_instrument['multiplier'] = 1
 
-                        this_instrument['entry_price'] = fix_values(
+                        this_instrument['entry_price'] = calculations.fix_values(
                             df['HA_close'].tail(1).values[0] * (1 - this_instrument['buy_ltp_percent'] / 100),
                             this_instrument['tick_size'])
                         this_instrument['entry_time'] = datetime.now()
                         if this_instrument['target_type'].lower() == 'percentage':
-                            this_instrument['target_price'] = fix_values(
+                            this_instrument['target_price'] = calculations.fix_values(
                                 this_instrument['entry_price'] * (1 + this_instrument['target'] / 100),
                                 this_instrument['tick_size'])
                         elif this_instrument['target_type'].lower() == 'value':
-                            this_instrument['target_price'] = fix_values(
+                            this_instrument['target_price'] = calculations.fix_values(
                                 this_instrument['entry_price'] + this_instrument['target'],
                                 this_instrument['tick_size'])
 
                         if this_instrument['stoploss_type'].lower() == 'percentage':
-                            this_instrument['sl_price'] = fix_values(
+                            this_instrument['sl_price'] = calculations.fix_values(
                                 this_instrument['entry_price'] * (1 - this_instrument['stoploss'] / 100),
                                 this_instrument['tick_size'])
 
                         elif this_instrument['stoploss_type'].lower() == 'value':
-                            this_instrument['sl_price'] = fix_values(
+                            this_instrument['sl_price'] = calculations.fix_values(
                                 this_instrument['entry_price'] - this_instrument['multiplier'] * this_instrument[
                                     'stoploss'], this_instrument['tick_size'])
 
@@ -710,7 +523,7 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                         this_instrument['status'] = 1
                         this_instrument['multiplier'] = -1
 
-                        this_instrument['entry_price'] = fix_values(
+                        this_instrument['entry_price'] = calculations.fix_values(
                             df['HA_close'].tail(1).values[0] * (1 - this_instrument['sell_ltp_percent'] / 100),
                             this_instrument['tick_size'])
                         this_instrument['entry_time'] = datetime.now()
@@ -718,21 +531,21 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                             this_instrument['entry_price'] = ltp
 
                         if this_instrument['target_type'].lower() == 'percentage':
-                            this_instrument['target_price'] = fix_values(
+                            this_instrument['target_price'] = calculations.fix_values(
                                 this_instrument['entry_price'] * (1 - this_instrument['target'] / 100),
                                 this_instrument['tick_size'])
                         elif this_instrument['target_type'].lower() == 'value':
-                            this_instrument['target_price'] = fix_values(
+                            this_instrument['target_price'] = calculations.fix_values(
                                 this_instrument['entry_price'] - this_instrument['target'],
                                 this_instrument['tick_size'])
 
                         if this_instrument['stoploss_type'].lower() == 'percentage':
-                            this_instrument['sl_price'] = fix_values(
+                            this_instrument['sl_price'] = calculations.fix_values(
                                 this_instrument['entry_price'] * (1 + this_instrument['stoploss'] / 100),
                                 this_instrument['tick_size'])
 
                         elif this_instrument['stoploss_type'].lower() == 'value':
-                            this_instrument['sl_price'] = fix_values(
+                            this_instrument['sl_price'] = calculations.fix_values(
                                 this_instrument['entry_price'] - this_instrument['multiplier'] * this_instrument[
                                     'stoploss'], this_instrument['tick_size'])
 
@@ -833,14 +646,16 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                                      'tradingsymbol': this_instrument['tradingsymbol'],
                                      'quantity': int(this_instrument['quantity']),
                                      'product': this_instrument['product_type'],
-                                     'transaction_type': reverse_txn_type(this_instrument['transaction_type']),
+                                     'transaction_type': calculations.reverse_txn_type(
+                                         this_instrument['transaction_type']),
                                      'order_type': 'SL',
                                      'price': this_instrument['sl_price'],
                                      'validity': 'DAY',
                                      'disclosed_quantity': None,
-                                     'trigger_price': get_adjusted_trigger_price(this_instrument['transaction_type'],
-                                                                                 this_instrument['sl_price'],
-                                                                                 this_instrument['tick_size']),
+                                     'trigger_price': calculations.get_adjusted_trigger_price(
+                                         this_instrument['transaction_type'],
+                                         this_instrument['sl_price'],
+                                         this_instrument['tick_size']),
                                      'squareoff': None,
                                      'stoploss': None,
                                      'trailing_stoploss': None,
@@ -1024,7 +839,7 @@ def main(manager_dict: dict, cancel_orders_queue: multiprocessing.Queue):
                                     this_instrument['exit_order_ids'][each_user]['order_status'] = order_status
                                     if order_status == 'PENDING':
                                         this_user['broker'].cancel_order(order_id)
-                                        txn_type = reverse_txn_type(this_instrument['transaction_type'])
+                                        txn_type = calculations.reverse_txn_type(this_instrument['transaction_type'])
                                         order = {'variety': 'regular',
                                                  'exchange': this_instrument['exchange'],
                                                  'tradingsymbol': this_instrument['tradingsymbol'],
